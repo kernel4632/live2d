@@ -40,9 +40,9 @@ onMounted(async () => {
 	containerRef.value.appendChild(app.view as HTMLCanvasElement);
 
 	// 3. 加载你的 Live2D 模型（路径必须是 public 下的静态路径）
-	model = await Live2DModel.from("ulvm2_0001/ulvm2_0001.model3.json", {
-		motionPreload: MotionPreloadStrategy.IDLE, // 预加载 idle 动作
-	});
+model = await Live2DModel.from("ulvm2_0001/ulvm2_0001.model3.json", {
+	motionPreload: MotionPreloadStrategy.NONE, // 重要！改成 NONE，否则 idle 里的 .exp3 会报错
+});
 
 	app.stage.addChild(model);
 
@@ -54,9 +54,9 @@ onMounted(async () => {
 
 	// 5. 自动交互（鼠标跟踪 + 点击触发动作）
 	model.on("hit", (hitAreas: string[]) => {
-		if (hitAreas.includes("body")) {
-			model.motion("tap_body", undefined, MotionPriority.NORMAL); // 点击身体播放动作
-		}
+if (hitAreas.includes("body")) {
+	model.expression();   // 随机播放一个表情（因为你的文件都是 exp3）
+}
 		if (hitAreas.includes("head")) {
 			model.expression(); // 随机表情
 		}
@@ -64,8 +64,13 @@ onMounted(async () => {
 
 	console.log("模型加载完成！可 console.dir(model) 查看内部结构");
   console.dir(model.internalModel.motionManager)
-console.log('可用动作组：', Object.keys(model.internalModel.motionManager.groups || {}))
-console.log('详细 motions 定义：', model.internalModel.motionManager.motionGroups)
+
+console.log("可用动作组：", Object.keys(model.internalModel.motionManager.groups || {}));
+console.log("表情管理器：", model.internalModel.motionManager.expressionManager);
+if (model.internalModel.motionManager.expressionManager) {
+  console.log("可用表情列表：", 
+    model.internalModel.motionManager.expressionManager.expressions?.map((e: any) => e.name));
+}
 });
 
 // 播放指定动作
@@ -75,43 +80,44 @@ const playMotion = (group: string) => {
 
 // 随机动作
 const playRandomMotion = (group: string) => {
-	if (model) model.motion(group);
+	if (model) model.expression();   // 随机表情
 };
-
 // 切换表情（需模型有定义的表情文件）
 const playExpression = (name?: string | number) => {
 	if (model) model.expression(name); // name 或 index，或不传随机
 };
 
 // 换装示例（核心代码！）
+// 把整个 toggleOutfit 函数替换成下面这个：
 const toggleOutfit = () => {
 	if (!model) return;
-	const internal = model.internalModel;
-	const coreModel = internal.coreModel; // Cubism 核心模型
+	const coreModel = model.internalModel.coreModel;
 
-	// 替换为你的模型实际部件 ID（在 Cubism Editor 中查看，或 console.log 模型文件）
-	const clothesPart1 = "PARTS_01"; // 示例：第一套衣服
-	const clothesPart2 = "PARTS_02"; // 示例：第二套衣服
+	// 打印所有部件ID（第一次点击按钮时看控制台，复制你需要的衣服ID）
+	console.log("=== 当前模型所有部件ID ===", coreModel._partIds || "未找到");
+
+	// 示例：把下面改成你实际的衣服部件ID（从上面 console 复制）
+	const clothesPart1 = "你的衣服部件ID1";   // ←←← 这里改成真实ID！
+	const clothesPart2 = "你的衣服部件ID2";   // ←←← 这里改成真实ID！
 
 	const index1 = coreModel.getPartIndex(clothesPart1);
 	const index2 = coreModel.getPartIndex(clothesPart2);
 
-	if (index1 !== -1 && index2 !== -1) {
-		// 切换逻辑：显示一套，隐藏另一套（可扩展多套）
-		const isFirstOn = coreModel.getPartOpacity(index1) > 0.5;
-		coreModel.setPartOpacity(index1, isFirstOn ? 0 : 1);
-		coreModel.setPartOpacity(index2, isFirstOn ? 1 : 0);
-		console.log("已切换衣服！");
+	if (index1 >= 0 && index2 >= 0) {
+		const opacity1 = coreModel.getPartOpacity(index1);
+		coreModel.setPartOpacity(index1, opacity1 > 0.5 ? 0 : 1);
+		coreModel.setPartOpacity(index2, opacity1 > 0.5 ? 1 : 0);
+		console.log("✅ 衣服切换成功！");
 	} else {
-		console.warn("未找到部件 ID，请检查模型部件名");
+		console.warn("❌ 未找到部件ID，请看上面 console 输出");
 	}
 };
-
 // 重置
 const resetModel = () => {
 	if (model) {
-		model.motion("idle", undefined, MotionPriority.IDLE); // 回到 idle
-		// 可额外重置所有部件 opacity = 1
+		// idle 组里是 .exp3.json，改用随机播放 expression 组更安全
+		model.motion("expression", undefined, MotionPriority.IDLE);
+		console.log("已重置为随机表情（因为你的 idle 组是 .exp3）");
 	}
 };
 
