@@ -88,29 +88,50 @@ const playExpression = (name?: string | number) => {
 };
 
 // 换装示例（核心代码！）
-// 把整个 toggleOutfit 函数替换成下面这个：
 const toggleOutfit = () => {
 	if (!model) return;
 	const coreModel = model.internalModel.coreModel;
 
-	// 打印所有部件ID（第一次点击按钮时看控制台，复制你需要的衣服ID）
-	console.log("=== 当前模型所有部件ID ===", coreModel._partIds || "未找到");
+	// 打印所有部件ID（方便你以后调试）
+	console.log("当前所有部件ID:", coreModel._partIds || coreModel.getPartIds?.() || "未找到");
 
-	// 示例：把下面改成你实际的衣服部件ID（从上面 console 复制）
-	const clothesPart1 = "你的衣服部件ID1";   // ←←← 这里改成真实ID！
-	const clothesPart2 = "你的衣服部件ID2";   // ←←← 这里改成真实ID！
+	// 使用你模型里实际的衣服部件前缀（v0000 / v0052 / v0100 / v0101）
+	const costumeGroups = ['v0000', 'v0052', 'v0100', 'v0101'];
 
-	const index1 = coreModel.getPartIndex(clothesPart1);
-	const index2 = coreModel.getPartIndex(clothesPart2);
-
-	if (index1 >= 0 && index2 >= 0) {
-		const opacity1 = coreModel.getPartOpacity(index1);
-		coreModel.setPartOpacity(index1, opacity1 > 0.5 ? 0 : 1);
-		coreModel.setPartOpacity(index2, opacity1 > 0.5 ? 1 : 0);
-		console.log("✅ 衣服切换成功！");
-	} else {
-		console.warn("❌ 未找到部件ID，请看上面 console 输出");
+	// 找到当前显示的是哪一套衣服（以 v0000_Part1 为例判断）
+	let currentIndex = 0;
+	for (let i = 0; i < costumeGroups.length; i++) {
+		const testId = `${costumeGroups[i]}_Part1`;
+		const opacity = coreModel.getPartOpacityById ? 
+			coreModel.getPartOpacityById(testId) : 0;
+		if (opacity > 0.5) {
+			currentIndex = i;
+			break;
+		}
 	}
+
+	// 切换到下一套
+	const nextIndex = (currentIndex + 1) % costumeGroups.length;
+	const nextPrefix = costumeGroups[nextIndex];
+
+	// 遍历所有衣服部件，只显示下一套，其余隐藏
+	costumeGroups.forEach(prefix => {
+		// 每套衣服通常有 Part1, Part2, Part3 等
+		for (let i = 1; i <= 8; i++) {   // 最多检查到 Part8，根据你的列表调整
+			const partId = `${prefix}_Part${i}`;
+			const index = coreModel.getPartIndex(partId);
+			if (index >= 0) {
+				const shouldShow = (prefix === nextPrefix);
+				if (coreModel.setPartOpacityById) {
+					coreModel.setPartOpacityById(partId, shouldShow ? 1 : 0);
+				} else if (coreModel.setPartOpacity) {
+					coreModel.setPartOpacity(index, shouldShow ? 1 : 0);
+				}
+			}
+		}
+	});
+
+	console.log(`✅ 已切换到衣服：${nextPrefix}`);
 };
 // 重置
 const resetModel = () => {
